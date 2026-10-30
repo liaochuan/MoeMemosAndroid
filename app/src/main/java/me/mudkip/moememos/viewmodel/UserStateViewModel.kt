@@ -1,5 +1,6 @@
 package me.mudkip.moememos.viewmodel
 
+import android.content.Context
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +11,7 @@ import com.skydoves.sandwich.ApiResponse
 import com.skydoves.sandwich.mapSuccess
 import com.skydoves.sandwich.suspendOnSuccess
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -28,12 +30,14 @@ import me.mudkip.moememos.data.model.UserData
 import me.mudkip.moememos.data.service.AccountService
 import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ext.suspendOnNotLogin
+import me.mudkip.moememos.widget.WidgetUpdater
 import okhttp3.OkHttpClient
 import java.time.Instant
 import javax.inject.Inject
 
 @HiltViewModel
 class UserStateViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val accountService: AccountService
 ) : ViewModel() {
 
@@ -55,6 +59,10 @@ class UserStateViewModel @Inject constructor(
                     is Account.MemosV1 -> it.info.host
                     else -> ""
                 }
+                // Widgets show data scoped to the signed-in account, so they have to redraw as soon
+                // as it changes: otherwise a switched or logged-out account keeps showing the
+                // previous account's memos until the next periodic refresh.
+                WidgetUpdater.updateWidgets(context)
             }
         }
     }

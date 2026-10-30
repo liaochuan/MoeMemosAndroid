@@ -1,7 +1,5 @@
 package me.mudkip.moememos.util
 
-import kotlin.math.ceil
-
 enum class MemoLineKind { TEXT, CHECKBOX }
 
 data class MemoLine(
@@ -26,6 +24,8 @@ private val checkboxLinePattern = Regex("""^(\s*)([-*+])\s+\[([ xX])\](?:\s(.*))
 fun parseMemoChecklist(content: String): List<MemoLine> {
     val lines = mutableListOf<MemoLine>()
     var inFence = false
+    var fenceChar = ' '
+    var fenceLength = 0
     var lineStart = 0
     while (lineStart < content.length) {
         val newline = content.indexOf('\n', lineStart)
@@ -35,15 +35,20 @@ fun parseMemoChecklist(content: String): List<MemoLine> {
 
         if (raw.isNotBlank()) {
             val trimmed = raw.trimStart()
-            val isFence = trimmed.startsWith("```") || trimmed.startsWith("~~~")
+            val fence = fenceMarkerOf(trimmed)
             when {
                 inFence -> {
                     lines += MemoLine(MemoLineKind.TEXT, raw, false, lineStart, end, 0)
-                    if (isFence) inFence = false
+                    // Only the fence character that opened the block can close it.
+                    if (fence != null && fence.first == fenceChar && fence.second >= fenceLength) {
+                        inFence = false
+                    }
                 }
-                isFence -> {
+                fence != null -> {
                     lines += MemoLine(MemoLineKind.TEXT, raw, false, lineStart, end, 0)
                     inFence = true
+                    fenceChar = fence.first
+                    fenceLength = fence.second
                 }
                 else -> {
                     val match = checkboxLinePattern.matchEntire(raw)
@@ -78,16 +83,23 @@ fun parseMemoChecklist(content: String): List<MemoLine> {
     return lines
 }
 
+/** Returns the fence character and its run length when [trimmed] starts a fenced code block. */
+private fun fenceMarkerOf(trimmed: String): Pair<Char, Int>? {
+    val char = trimmed.firstOrNull() ?: return null
+    if (char != '`' && char != '~') return null
+    val length = trimmed.takeWhile { it == char }.length
+    return if (length >= 3) char to length else null
+}
+
 /** Returns the raw line at the given offsets, or null when the range is not exactly one line of [content]. */
 fun lineAt(content: String, startOffset: Int, endOffset: Int): String? {
     if (startOffset < 0 || endOffset > content.length || startOffset >= endOffset) return null
     if (startOffset > 0 && content[startOffset - 1] != '\n') return null
-    if (endOffset < content.length &&
-        content[endOffset] != '\n' &&
-        !(content[endOffset] == '\r' && endOffset + 1 < content.length && content[endOffset + 1] == '\n')
-    ) {
-        return null
-    }
+    val endsLine = endOffset == content.length ||
+        content[endOffset] == '\n' ||
+        (content[endOffset] == '\r' &&
+            (endOffset + 1 == content.length || content[endOffset + 1] == '\n'))
+    if (!endsLine) return null
     val line = content.substring(startOffset, endOffset)
     return if (line.contains('\n')) null else line
 }
@@ -106,18 +118,15 @@ fun toggleCheckboxIn(content: String, startOffset: Int, endOffset: Int, checked:
     return content.substring(0, markerOffset) + newMarker + content.substring(markerOffset + 1)
 }
 
-/** Greedily keeps the leading lines that fit [lineBudget] rendered lines, flagging whether anything was cut. */
-fun visibleLines(lines: List<MemoLine>, lineBudget: Int, charsPerLine: Int): VisibleLines {
+/**
+ * Keeps the leading lines that fit [lineBudget], flagging whether anything was cut.
+ *
+ * The widget renders one visual line per entry and Glance has no ellipsis for overflowing text, so
+ * every entry costs exactly one line no matter how long it is.
+ */
+fun visibleLines(lines: List<MemoLine>, lineBudget: Int): VisibleLines {
     if (lineBudget <= 0) return VisibleLines(emptyList(), lines.isNotEmpty())
-    val perLine = charsPerLine.coerceAtLeast(1)
-    val visible = mutableListOf<MemoLine>()
-    var used = 0
-    for (line in lines) {
-        val cost = ceil(line.text.length.coerceAtLeast(1).toDouble() / perLine).toInt()
-        if (used + cost > lineBudget) break
-        visible += line
-        used += cost
-    }
+    val visible = lines.take(lineBudget)
     return VisibleLines(visible, visible.size < lines.size)
 }
 

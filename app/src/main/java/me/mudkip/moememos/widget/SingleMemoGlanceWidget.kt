@@ -30,7 +30,6 @@ import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.background
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
@@ -130,7 +129,7 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                     missing = memoId != null && (loaded == null || loaded.isDeleted || loaded.archived)
                     error = null
                 } catch (e: Exception) {
-                    error = e.message ?: "Unknown error"
+                    error = context.getString(R.string.error_unknown)
                     Timber.tag("SingleMemoWidget").e(e, "Exception in single memo widget")
                 } finally {
                     isLoading = false
@@ -239,7 +238,6 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
 
             val size = LocalSize.current
             val lineBudget = ((size.height.value - 24f - 20f - 8f) / 20f).toInt().coerceAtLeast(1)
-            val charsPerLine = ((size.width.value - 24f - 24f) / 7f).toInt().coerceAtLeast(8)
             val parsedLines = parseMemoChecklist(memo.content)
             if (parsedLines.isEmpty()) {
                 Text(
@@ -247,11 +245,17 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                     style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp)
                 )
             } else {
-                val visible = visibleLines(parsedLines, lineBudget, charsPerLine)
+                // The "…" indicator is a line of its own, so it has to be taken out of the budget
+                // first: a line added after the budget is already full gets clipped by the widget.
+                val showEllipsis = parsedLines.size > lineBudget && lineBudget > 1
+                val contentBudget = if (showEllipsis) lineBudget - 1 else lineBudget
+                val visible = visibleLines(parsedLines, contentBudget)
                 visible.lines.forEach { line ->
                     when (line.kind) {
                         MemoLineKind.TEXT -> Text(
-                            text = line.text,
+                            // Leading whitespace is rendered as padding instead of as text, so an
+                            // indented line is not indented twice.
+                            text = line.text.trimStart(),
                             style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
                             maxLines = 1,
                             modifier = GlanceModifier.padding(start = (8 * line.indentLevel).dp)
@@ -276,7 +280,7 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                         )
                     }
                 }
-                if (visible.truncated) {
+                if (showEllipsis) {
                     Text(
                         text = "…",
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp)
@@ -316,7 +320,7 @@ class ToggleCheckboxAction : ActionCallback {
         if (memoId == null || accountKey == null || startOffset == null ||
             endOffset == null || targetChecked == null || expectedLine == null
         ) {
-            refresh(context, glanceId)
+            refresh(context)
             return
         }
 
@@ -327,20 +331,20 @@ class ToggleCheckboxAction : ActionCallback {
             ).memoService()
             val currentAccountKey = context.settingsDataStore.data.first().currentUser
             if (accountKey != currentAccountKey) {
-                refresh(context, glanceId)
+                refresh(context)
                 return
             }
 
             val memo = withContext(Dispatchers.IO) { memoService.getRepository().getMemo(memoId) }
             if (memo == null || memo.isDeleted || memo.archived) {
                 // Writing here would resurrect a deleted memo: updateMemo clears isDeleted.
-                refresh(context, glanceId)
+                refresh(context)
                 return
             }
 
             if (lineAt(memo.content, startOffset, endOffset) != expectedLine) {
                 // The memo changed elsewhere and the offsets no longer point at the tapped line.
-                refresh(context, glanceId)
+                refresh(context)
                 return
             }
 
@@ -354,15 +358,21 @@ class ToggleCheckboxAction : ActionCallback {
             Timber.tag("SingleMemoWidget").e(e, "Exception toggling checkbox in single memo widget")
         }
 
-        refresh(context, glanceId)
+        refresh(context)
     }
 
-    private suspend fun refresh(context: Context, glanceId: GlanceId) {
-        updateAppWidgetState(context, glanceId) { prefs ->
-            prefs[SingleMemoWidgetKeys.refreshKey] =
-                (prefs[SingleMemoWidgetKeys.refreshKey] ?: 0L) + 1
+    /**
+     * Refreshes every widget rather than only this one: the write above bypasses the app's view
+     * models, so another single memo widget bound to the same memo (or a list widget showing it)
+     * would otherwise keep the old checklist until the next periodic refresh. Failures are logged
+     * instead of escaping [onAction], where they would crash the widget's broadcast.
+     */
+    private suspend fun refresh(context: Context) {
+        try {
+            WidgetUpdateScheduler.updateAllWidgets(context)
+        } catch (e: Exception) {
+            Timber.tag("SingleMemoWidget").e(e, "Exception refreshing widgets after checkbox toggle")
         }
-        SingleMemoGlanceWidget().update(context, glanceId)
     }
 }
 

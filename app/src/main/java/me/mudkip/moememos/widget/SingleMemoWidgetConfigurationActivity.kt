@@ -62,6 +62,7 @@ import me.mudkip.moememos.data.service.AccountService
 import me.mudkip.moememos.data.service.MemoService
 import me.mudkip.moememos.ui.security.AppLockGate
 import me.mudkip.moememos.ui.theme.MoeMemosTheme
+import timber.log.Timber
 import java.time.Instant
 import javax.inject.Inject
 
@@ -131,7 +132,13 @@ class SingleMemoWidgetConfigurationActivity : FragmentActivity() {
                     definition = PreferencesGlanceStateDefinition,
                     glanceId = glanceId
                 )
-                selectedMemoId = prefs[SingleMemoWidgetKeys.memoId]
+                // Prefill only with a memo that can actually be shown. Prefilling a deleted or
+                // archived memo would leave the confirm button enabled while saving it changes
+                // nothing, which looks like a dead button.
+                selectedMemoId = prefs[SingleMemoWidgetKeys.memoId]?.takeIf { boundId ->
+                    memoService.getRepository().getMemo(boundId)
+                        ?.let { !it.isDeleted && !it.archived } == true
+                }
             } catch (e: Exception) {
                 // Ignore error; the screen still allows picking a memo or creating one.
             } finally {
@@ -297,23 +304,29 @@ class SingleMemoWidgetConfigurationActivity : FragmentActivity() {
     private fun saveConfig(identifier: String? = null) {
         if (identifier == null) return
         lifecycleScope.launch {
-            val glanceId = GlanceAppWidgetManager(this@SingleMemoWidgetConfigurationActivity)
-                .getGlanceIdBy(appWidgetId)
+            try {
+                val glanceId = GlanceAppWidgetManager(this@SingleMemoWidgetConfigurationActivity)
+                    .getGlanceIdBy(appWidgetId)
 
-            updateAppWidgetState(this@SingleMemoWidgetConfigurationActivity, glanceId) { prefs ->
-                prefs[SingleMemoWidgetKeys.memoId] = identifier
-                prefs[SingleMemoWidgetKeys.accountKey] = currentAccount?.accountKey().orEmpty()
-                prefs[SingleMemoWidgetKeys.appWidgetId] = appWidgetId
-                prefs[SingleMemoWidgetKeys.refreshKey] = 0L
+                updateAppWidgetState(this@SingleMemoWidgetConfigurationActivity, glanceId) { prefs ->
+                    prefs[SingleMemoWidgetKeys.memoId] = identifier
+                    prefs[SingleMemoWidgetKeys.accountKey] = currentAccount?.accountKey().orEmpty()
+                    prefs[SingleMemoWidgetKeys.appWidgetId] = appWidgetId
+                    prefs[SingleMemoWidgetKeys.refreshKey] = 0L
+                }
+
+                SingleMemoGlanceWidget().update(this@SingleMemoWidgetConfigurationActivity, glanceId)
+
+                val resultValue = Intent().apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                }
+                setResult(RESULT_OK, resultValue)
+            } catch (e: Exception) {
+                // The widget was removed while this screen was open; nothing left to configure.
+                Timber.tag("SingleMemoWidget").e(e, "Exception saving single memo widget configuration")
+            } finally {
+                finish()
             }
-
-            SingleMemoGlanceWidget().update(this@SingleMemoWidgetConfigurationActivity, glanceId)
-
-            val resultValue = Intent().apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            }
-            setResult(RESULT_OK, resultValue)
-            finish()
         }
     }
 }

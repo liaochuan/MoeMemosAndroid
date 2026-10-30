@@ -84,18 +84,74 @@ class MemoChecklistTest {
 
         assertEquals(
             listOf("a", "b"),
-            visibleLines(lines, lineBudget = 2, charsPerLine = 100).lines.map { it.text }
+            visibleLines(lines, lineBudget = 2).lines.map { it.text }
         )
-        assertTrue(visibleLines(lines, lineBudget = 2, charsPerLine = 100).truncated)
-        assertEquals(false, visibleLines(lines, lineBudget = 5, charsPerLine = 100).truncated)
+        assertTrue(visibleLines(lines, lineBudget = 2).truncated)
+        assertEquals(false, visibleLines(lines, lineBudget = 5).truncated)
     }
 
     @Test
     fun visibleLinesHandlesZeroBudgetAndHugeText() {
         val lines = parseMemoChecklist("- [ ] a")
 
-        assertEquals(emptyList<MemoLine>(), visibleLines(lines, lineBudget = 0, charsPerLine = 100).lines)
-        assertTrue(visibleLines(lines, lineBudget = 0, charsPerLine = 100).truncated)
-        assertEquals(1, visibleLines(lines, lineBudget = 3, charsPerLine = 1).lines.size)
+        assertEquals(emptyList<MemoLine>(), visibleLines(lines, lineBudget = 0).lines)
+        assertTrue(visibleLines(lines, lineBudget = 0).truncated)
+        assertEquals(1, visibleLines(lines, lineBudget = 3).lines.size)
+    }
+
+    @Test
+    fun visibleLinesKeepsAVeryLongLineWhole() {
+        // Every entry costs one rendered line, so a long line must not eat the whole budget and
+        // leave the widget showing nothing but the truncation marker.
+        val lines = parseMemoChecklist("- [ ] " + "x".repeat(10_000))
+
+        val visible = visibleLines(lines, lineBudget = 1)
+
+        assertEquals(1, visible.lines.size)
+        assertEquals(false, visible.truncated)
+    }
+
+    @Test
+    fun parsesEmptyContentAsNoLines() {
+        assertEquals(emptyList<MemoLine>(), parseMemoChecklist(""))
+    }
+
+    @Test
+    fun treatsInlineCheckboxMarkersAsText() {
+        val lines = parseMemoChecklist("a - [ ] b")
+
+        assertEquals(listOf(MemoLineKind.TEXT), lines.map { it.kind })
+        assertEquals("a - [ ] b", lines[0].text)
+    }
+
+    @Test
+    fun doesNotCloseATildeFenceWithBackticks() {
+        val content = "~~~\n- [ ] in fence\n```\n- [ ] still fenced\n~~~\n- [ ] real task"
+        val lines = parseMemoChecklist(content)
+
+        assertEquals(
+            listOf(
+                MemoLineKind.TEXT,
+                MemoLineKind.TEXT,
+                MemoLineKind.TEXT,
+                MemoLineKind.TEXT,
+                MemoLineKind.TEXT,
+                MemoLineKind.CHECKBOX
+            ),
+            lines.map { it.kind }
+        )
+        assertEquals("real task", lines.last().text)
+    }
+
+    @Test
+    fun togglesUppercaseMarker() {
+        val content = "- [X] milk"
+
+        assertEquals("- [ ] milk", toggleCheckboxIn(content, 0, content.length, false))
+    }
+
+    @Test
+    fun lineAtAcceptsContentEndingWithBareCarriageReturn() {
+        assertEquals("a", lineAt("a\r", 0, 1))
     }
 }
