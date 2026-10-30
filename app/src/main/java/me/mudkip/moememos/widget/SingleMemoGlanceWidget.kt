@@ -1,6 +1,8 @@
 package me.mudkip.moememos.widget
 
 import android.content.Context
+import android.content.Intent
+import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,32 +12,59 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
+import androidx.glance.ColorFilter
+import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.glance.LocalSize
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
+import androidx.glance.action.clickable
+import androidx.glance.appwidget.CheckBox
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.background
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.state.PreferencesGlanceStateDefinition
-import androidx.glance.unit.ColorProvider
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import me.mudkip.moememos.MainActivity
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.local.entity.MemoEntity
 import me.mudkip.moememos.data.model.MemoEditGesture
+import me.mudkip.moememos.data.model.MemoVisibility
 import me.mudkip.moememos.data.service.MemoService
 import me.mudkip.moememos.ext.settingsDataStore
+import me.mudkip.moememos.util.MemoLineKind
+import me.mudkip.moememos.util.lineAt
+import me.mudkip.moememos.util.parseMemoChecklist
+import me.mudkip.moememos.util.toggleCheckboxIn
+import me.mudkip.moememos.util.visibleLines
 import timber.log.Timber
+import java.time.Instant
 
 class SingleMemoGlanceWidget : GlanceAppWidget() {
 
@@ -76,12 +105,13 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         openInEditor: Boolean
     ) {
         val memoId = prefs[SingleMemoWidgetKeys.memoId]
+        val accountKey = prefs[SingleMemoWidgetKeys.accountKey]
         val refreshKey = prefs[SingleMemoWidgetKeys.refreshKey] ?: 0L
         var memo by remember { mutableStateOf<MemoEntity?>(null) }
         var isLoading by remember { mutableStateOf(true) }
         var error by remember { mutableStateOf<String?>(null) }
 
-        LaunchedEffect(memoId, refreshKey) {
+        LaunchedEffect(memoId, accountKey, refreshKey) {
             withContext(Dispatchers.IO) {
                 try {
                     isLoading = true
@@ -110,14 +140,108 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                     color = GlanceTheme.colors.error
                 )
                 memo == null -> CenteredMessage(context.getString(R.string.memo_not_found))
-                else -> Text(
-                    text = memo?.content.orEmpty(),
+                else -> {
+                    val loadedMemo = memo ?: return@Column
+                    MemoContent(context, loadedMemo, accountKey, openInEditor)
+                }
+            }
+        }
+    }
+
+    @OptIn(ExperimentalGlanceApi::class)
+    @Composable
+    private fun MemoContent(
+        context: Context,
+        memo: MemoEntity,
+        accountKey: String?,
+        openInEditor: Boolean
+    ) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .clickable(actionStartActivity(createMemoIntent(context, memo.identifier, openInEditor)))
+        ) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = DateUtils.getRelativeTimeSpanString(
+                        memo.date.toEpochMilli(),
+                        Instant.now().toEpochMilli(),
+                        DateUtils.MINUTE_IN_MILLIS
+                    ).toString(),
                     style = TextStyle(
-                        color = GlanceTheme.colors.onSurface,
-                        fontSize = 14.sp
-                    ),
-                    maxLines = 20
+                        color = GlanceTheme.colors.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
                 )
+                if (memo.visibility != MemoVisibility.PUBLIC) {
+                    Spacer(modifier = GlanceModifier.width(4.dp))
+                    Image(
+                        provider = ImageProvider(android.R.drawable.ic_lock_lock),
+                        contentDescription = context.getString(R.string.memo_visibility_private),
+                        modifier = GlanceModifier.size(14.dp)
+                    )
+                }
+                if (memo.pinned) {
+                    Spacer(modifier = GlanceModifier.width(4.dp))
+                    Image(
+                        provider = ImageProvider(R.drawable.ic_pin),
+                        contentDescription = context.getString(R.string.pin),
+                        modifier = GlanceModifier.size(14.dp),
+                        colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant)
+                    )
+                }
+            }
+
+            Spacer(modifier = GlanceModifier.height(8.dp))
+
+            val size = LocalSize.current
+            val lineBudget = ((size.height.value - 24f - 20f - 8f) / 20f).toInt().coerceAtLeast(1)
+            val charsPerLine = ((size.width.value - 24f - 24f) / 7f).toInt().coerceAtLeast(8)
+            val parsedLines = parseMemoChecklist(memo.content)
+            if (parsedLines.isEmpty()) {
+                Text(
+                    text = context.getString(R.string.single_memo_widget_empty_memo),
+                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp)
+                )
+            } else {
+                val visible = visibleLines(parsedLines, lineBudget, charsPerLine)
+                visible.lines.forEach { line ->
+                    when (line.kind) {
+                        MemoLineKind.TEXT -> Text(
+                            text = line.text,
+                            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
+                            maxLines = 1,
+                            modifier = GlanceModifier.padding(start = (8 * line.indentLevel).dp)
+                        )
+                        MemoLineKind.CHECKBOX -> CheckBox(
+                            checked = line.checked,
+                            onCheckedChange = actionRunCallback<ToggleCheckboxAction>(
+                                actionParametersOf(
+                                    ToggleCheckboxKeys.memoId to memo.identifier,
+                                    ToggleCheckboxKeys.accountKey to accountKey.orEmpty(),
+                                    ToggleCheckboxKeys.startOffset to line.startOffset,
+                                    ToggleCheckboxKeys.endOffset to line.endOffset,
+                                    ToggleCheckboxKeys.targetChecked to !line.checked,
+                                    ToggleCheckboxKeys.expectedLine to
+                                        memo.content.substring(line.startOffset, line.endOffset)
+                                )
+                            ),
+                            text = line.text,
+                            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
+                            maxLines = 1,
+                            modifier = GlanceModifier.padding(start = (8 * line.indentLevel).dp)
+                        )
+                    }
+                }
+                if (visible.truncated) {
+                    Text(
+                        text = "…",
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp)
+                    )
+                }
             }
         }
     }
@@ -135,3 +259,85 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         }
     }
 }
+
+class ToggleCheckboxAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val memoId = parameters[ToggleCheckboxKeys.memoId]
+        val accountKey = parameters[ToggleCheckboxKeys.accountKey]
+        val startOffset = parameters[ToggleCheckboxKeys.startOffset]
+        val endOffset = parameters[ToggleCheckboxKeys.endOffset]
+        val targetChecked = parameters[ToggleCheckboxKeys.targetChecked]
+        val expectedLine = parameters[ToggleCheckboxKeys.expectedLine]
+
+        if (memoId == null || accountKey == null || startOffset == null ||
+            endOffset == null || targetChecked == null || expectedLine == null
+        ) {
+            refresh(context, glanceId)
+            return
+        }
+
+        try {
+            val memoService = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                WidgetEntryPoint::class.java
+            ).memoService()
+            val currentAccountKey = context.settingsDataStore.data.first().currentUser
+            if (accountKey != currentAccountKey) {
+                refresh(context, glanceId)
+                return
+            }
+
+            val memo = withContext(Dispatchers.IO) { memoService.getRepository().getMemo(memoId) }
+            if (memo == null || memo.isDeleted || memo.archived) {
+                // Writing here would resurrect a deleted memo: updateMemo clears isDeleted.
+                refresh(context, glanceId)
+                return
+            }
+
+            if (lineAt(memo.content, startOffset, endOffset) != expectedLine) {
+                // The memo changed elsewhere and the offsets no longer point at the tapped line.
+                refresh(context, glanceId)
+                return
+            }
+
+            val newContent = toggleCheckboxIn(memo.content, startOffset, endOffset, targetChecked)
+            if (newContent != null) {
+                withContext(Dispatchers.IO) {
+                    memoService.getRepository().updateMemo(memoId, content = newContent)
+                }
+            }
+        } catch (e: Exception) {
+            Timber.tag("SingleMemoWidget").e(e, "Exception toggling checkbox in single memo widget")
+        }
+
+        refresh(context, glanceId)
+    }
+
+    private suspend fun refresh(context: Context, glanceId: GlanceId) {
+        updateAppWidgetState(context, glanceId) { prefs ->
+            prefs[SingleMemoWidgetKeys.refreshKey] =
+                (prefs[SingleMemoWidgetKeys.refreshKey] ?: 0L) + 1
+        }
+        SingleMemoGlanceWidget().update(context, glanceId)
+    }
+}
+
+object ToggleCheckboxKeys {
+    val memoId: ActionParameters.Key<String> = ActionParameters.Key("single_memo_toggle_memo_id")
+    val accountKey: ActionParameters.Key<String> = ActionParameters.Key("single_memo_toggle_account_key")
+    val startOffset: ActionParameters.Key<Int> = ActionParameters.Key("single_memo_toggle_start")
+    val endOffset: ActionParameters.Key<Int> = ActionParameters.Key("single_memo_toggle_end")
+    val targetChecked: ActionParameters.Key<Boolean> = ActionParameters.Key("single_memo_toggle_checked")
+    val expectedLine: ActionParameters.Key<String> = ActionParameters.Key("single_memo_toggle_line")
+}
+
+private fun createMemoIntent(context: Context, memoId: String, openInEditor: Boolean): Intent =
+    Intent(context, MainActivity::class.java).apply {
+        action = if (openInEditor) MainActivity.ACTION_EDIT_MEMO else MainActivity.ACTION_VIEW_MEMO
+        putExtra(MainActivity.EXTRA_MEMO_ID, memoId)
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    }

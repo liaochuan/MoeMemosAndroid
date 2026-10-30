@@ -114,6 +114,7 @@
     <string name="single_memo_widget_search_hint">搜索 MEMO</string>
     <string name="single_memo_widget_new_memo_hint">写一条要固定的 MEMO…</string>
     <string name="single_memo_widget_create_and_bind">创建并绑定</string>
+    <string name="single_memo_widget_empty_memo">MEMO 没有内容。</string>
     <string name="loading">加载中…</string>
     <string name="error_unknown">未知错误</string>
     <string name="no_memos">未找到 MEMO</string>
