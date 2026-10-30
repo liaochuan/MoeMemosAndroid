@@ -110,6 +110,10 @@
     <string name="single_memo_widget_title">單則 MEMO</string>
     <string name="single_memo_widget_description">顯示固定的一則 MEMO，支援勾選待辦。</string>
     <string name="single_memo_widget_empty">選擇一則要顯示的 MEMO。</string>
+    <string name="single_memo_widget_pick_memo">選擇現有 MEMO</string>
+    <string name="single_memo_widget_search_hint">搜尋 MEMO</string>
+    <string name="single_memo_widget_new_memo_hint">寫一則要固定的 MEMO…</string>
+    <string name="single_memo_widget_create_and_bind">建立並綁定</string>
     <string name="loading">載入中…</string>
     <string name="error_unknown">未知錯誤</string>
     <string name="no_memos">找不到 MEMO</string>

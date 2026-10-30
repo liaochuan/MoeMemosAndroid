@@ -67,6 +67,15 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".widget.SingleMemoWidgetConfigurationActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MoeMemos">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
         
         <provider
             android:authorities="me.mudkip.moememos.fileprovider"

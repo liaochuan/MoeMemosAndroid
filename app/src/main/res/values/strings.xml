@@ -150,6 +150,10 @@
     <string name="single_memo_widget_title">Single Memo</string>
     <string name="single_memo_widget_description">Shows one memo, with its checkboxes.</string>
     <string name="single_memo_widget_empty">Pick a memo for this widget.</string>
+    <string name="single_memo_widget_pick_memo">Pick an existing memo</string>
+    <string name="single_memo_widget_search_hint">Search memos</string>
+    <string name="single_memo_widget_new_memo_hint">Write a memo to pin…</string>
+    <string name="single_memo_widget_create_and_bind">Create and bind</string>
     <string name="loading">Loading…</string>
     <string name="error_unknown">Unknown error</string>
     <string name="no_memos">No memos found</string>
