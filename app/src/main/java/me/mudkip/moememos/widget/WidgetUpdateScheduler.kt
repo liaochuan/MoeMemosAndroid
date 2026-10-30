@@ -35,8 +35,10 @@ object WidgetUpdateScheduler {
             val manager = GlanceAppWidgetManager(context)
             val hasMemosWidget = manager.getGlanceIds(MoeMemosGlanceWidget::class.java).isNotEmpty()
             val hasMemoryWidget = manager.getGlanceIds(MemoryGlanceWidget::class.java).isNotEmpty()
+            val hasSingleMemoWidget =
+                manager.getGlanceIds(SingleMemoGlanceWidget::class.java).isNotEmpty()
 
-            if (!hasMemosWidget && !hasMemoryWidget) {
+            if (!hasMemosWidget && !hasMemoryWidget && !hasSingleMemoWidget) {
                 cancelWidgetUpdates(context)
             }
         }
@@ -46,6 +48,7 @@ object WidgetUpdateScheduler {
         val manager = GlanceAppWidgetManager(context)
         val memosWidgetIds = manager.getGlanceIds(MoeMemosGlanceWidget::class.java)
         val memoryWidgetIds = manager.getGlanceIds(MemoryGlanceWidget::class.java)
+        val singleMemoWidgetIds = manager.getGlanceIds(SingleMemoGlanceWidget::class.java)
 
         memosWidgetIds.forEach { glanceId ->
             // update() alone only redraws a widget whose session is still running; its memo list
@@ -57,6 +60,15 @@ object WidgetUpdateScheduler {
         }
         memoryWidgetIds.forEach { glanceId ->
             MemoryGlanceWidget().update(context, glanceId)
+        }
+        singleMemoWidgetIds.forEach { glanceId ->
+            // Same as the single memo widget's own refresh: the memo is reloaded when refreshKey
+            // changes, which is what makes the copy on the home screen follow edits in the app.
+            updateAppWidgetState(context, glanceId) { prefs ->
+                prefs[SingleMemoWidgetKeys.refreshKey] =
+                    (prefs[SingleMemoWidgetKeys.refreshKey] ?: 0L) + 1
+            }
+            SingleMemoGlanceWidget().update(context, glanceId)
         }
     }
 }

@@ -1,5 +1,6 @@
 package me.mudkip.moememos.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateUtils
@@ -106,16 +107,27 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
     ) {
         val memoId = prefs[SingleMemoWidgetKeys.memoId]
         val accountKey = prefs[SingleMemoWidgetKeys.accountKey]
+        val appWidgetId = prefs[SingleMemoWidgetKeys.appWidgetId]
         val refreshKey = prefs[SingleMemoWidgetKeys.refreshKey] ?: 0L
         var memo by remember { mutableStateOf<MemoEntity?>(null) }
         var isLoading by remember { mutableStateOf(true) }
+        var missing by remember { mutableStateOf(false) }
         var error by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(memoId, accountKey, refreshKey) {
             withContext(Dispatchers.IO) {
                 try {
                     isLoading = true
-                    memo = memoId?.let { memoService.getRepository().getMemo(it) }
+                    // A memo bound to another account is unreachable from here, and reading it
+                    // through the current account's repository would return a stale or foreign row.
+                    val currentAccountKey = context.settingsDataStore.data.first().currentUser
+                    val loaded = if (memoId == null || accountKey != currentAccountKey) {
+                        null
+                    } else {
+                        memoService.getRepository().getMemo(memoId)
+                    }
+                    memo = loaded
+                    missing = memoId != null && (loaded == null || loaded.isDeleted || loaded.archived)
                     error = null
                 } catch (e: Exception) {
                     error = e.message ?: "Unknown error"
@@ -133,18 +145,46 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                 .padding(12.dp)
         ) {
             when {
-                memoId == null -> CenteredMessage(context.getString(R.string.single_memo_widget_empty))
                 isLoading -> CenteredMessage(context.getString(R.string.loading))
                 error != null -> CenteredMessage(
                     error ?: context.getString(R.string.error_unknown),
                     color = GlanceTheme.colors.error
                 )
-                memo == null -> CenteredMessage(context.getString(R.string.memo_not_found))
+                memoId == null -> ConfigureMessage(
+                    context,
+                    appWidgetId,
+                    context.getString(R.string.single_memo_widget_empty)
+                )
+                missing || memo == null -> ConfigureMessage(
+                    context,
+                    appWidgetId,
+                    context.getString(R.string.single_memo_widget_missing)
+                )
                 else -> {
                     val loadedMemo = memo ?: return@Column
                     MemoContent(context, loadedMemo, accountKey, openInEditor)
                 }
             }
+        }
+    }
+
+    /** Center message that opens this widget's configuration when the bound memo can no longer be shown. */
+    @Composable
+    private fun ConfigureMessage(context: Context, appWidgetId: Int?, message: String) {
+        Box(
+            modifier = if (appWidgetId == null) {
+                GlanceModifier.fillMaxSize()
+            } else {
+                GlanceModifier
+                    .fillMaxSize()
+                    .clickable(actionStartActivity(createConfigureIntent(context, appWidgetId)))
+            },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = message,
+                style = TextStyle(color = GlanceTheme.colors.onBackground)
+            )
         }
     }
 
@@ -340,4 +380,10 @@ private fun createMemoIntent(context: Context, memoId: String, openInEditor: Boo
         action = if (openInEditor) MainActivity.ACTION_EDIT_MEMO else MainActivity.ACTION_VIEW_MEMO
         putExtra(MainActivity.EXTRA_MEMO_ID, memoId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    }
+
+private fun createConfigureIntent(context: Context, appWidgetId: Int): Intent =
+    Intent(context, SingleMemoWidgetConfigurationActivity::class.java).apply {
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }

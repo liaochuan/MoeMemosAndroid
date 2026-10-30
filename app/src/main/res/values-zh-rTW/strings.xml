@@ -115,6 +115,7 @@
     <string name="single_memo_widget_new_memo_hint">寫一則要固定的 MEMO…</string>
     <string name="single_memo_widget_create_and_bind">建立並綁定</string>
     <string name="single_memo_widget_empty_memo">MEMO 沒有內容。</string>
+    <string name="single_memo_widget_missing">MEMO 已刪除，點擊重新選擇。</string>
     <string name="loading">載入中…</string>
     <string name="error_unknown">未知錯誤</string>
     <string name="no_memos">找不到 MEMO</string>
