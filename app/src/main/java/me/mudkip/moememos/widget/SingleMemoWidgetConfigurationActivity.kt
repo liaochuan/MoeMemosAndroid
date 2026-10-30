@@ -49,6 +49,7 @@ import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.lifecycle.lifecycleScope
+import com.skydoves.sandwich.ApiResponse
 import com.skydoves.sandwich.suspendOnSuccess
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
@@ -56,6 +57,7 @@ import kotlinx.coroutines.launch
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.local.entity.MemoEntity
 import me.mudkip.moememos.data.model.Account
+import me.mudkip.moememos.data.model.MemoVisibility
 import me.mudkip.moememos.data.service.AccountService
 import me.mudkip.moememos.data.service.MemoService
 import me.mudkip.moememos.ui.security.AppLockGate
@@ -110,6 +112,7 @@ class SingleMemoWidgetConfigurationActivity : FragmentActivity() {
         var newMemoContent by remember { mutableStateOf("") }
         var memos by remember { mutableStateOf<List<MemoEntity>>(emptyList()) }
         var isLoading by remember { mutableStateOf(true) }
+        var createFailed by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             try {
@@ -182,10 +185,19 @@ class SingleMemoWidgetConfigurationActivity : FragmentActivity() {
                     item {
                         Button(
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = false,
-                            onClick = { }
+                            enabled = newMemoContent.isNotBlank(),
+                            onClick = { createAndBind(newMemoContent) { createFailed = true } }
                         ) {
                             Text(stringResource(R.string.single_memo_widget_create_and_bind))
+                        }
+                    }
+                    if (createFailed) {
+                        item {
+                            Text(
+                                text = stringResource(R.string.error_unknown),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
                         }
                     }
                     item {
@@ -258,6 +270,26 @@ class SingleMemoWidgetConfigurationActivity : FragmentActivity() {
                     contentDescription = stringResource(R.string.confirm),
                     tint = MaterialTheme.colorScheme.primary
                 )
+            }
+        }
+    }
+
+    private fun createAndBind(content: String, onFailure: () -> Unit) {
+        val trimmed = content.trim()
+        if (trimmed.isEmpty()) return
+        lifecycleScope.launch {
+            val visibility = currentAccount?.toUser()?.defaultVisibility ?: MemoVisibility.PRIVATE
+            val response = memoService.getRepository().createMemo(
+                content = trimmed,
+                visibility = visibility,
+                resources = emptyList(),
+                tags = emptyList()
+            )
+            response.suspendOnSuccess {
+                saveConfig(data.identifier)
+            }
+            if (response !is ApiResponse.Success) {
+                onFailure()
             }
         }
     }
