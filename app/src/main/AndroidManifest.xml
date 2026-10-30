@@ -103,6 +103,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/memory_glance_widget_info" />
         </receiver>
+
+        <!-- Single Memo Widget Receiver -->
+        <receiver
+            android:name=".widget.SingleMemoGlanceWidgetReceiver"
+            android:label="@string/single_memo_widget_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/single_memo_glance_widget_info" />
+        </receiver>
     </application>
 
 </manifest>
