@@ -7,7 +7,7 @@
         android:shortcutShortLabel="@string/new_memo">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="me.mudkip.moememos"
+            android:targetPackage="top.liaocl.moememos"
             android:targetClass="me.mudkip.moememos.MainActivity">
             <extra android:name="action" android:value="compose" />
         </intent>
@@ -19,7 +19,7 @@
         android:shortcutShortLabel="@string/search">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="me.mudkip.moememos"
+            android:targetPackage="top.liaocl.moememos"
             android:targetClass="me.mudkip.moememos.MainActivity">
             <extra android:name="action" android:value="search" />
         </intent>

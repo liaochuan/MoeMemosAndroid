@@ -17,6 +17,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("me.mudkip.moememos", appContext.packageName)
+        assertEquals("top.liaocl.moememos", appContext.packageName)
     }
 }

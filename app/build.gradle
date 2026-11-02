@@ -30,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "me.mudkip.moememos"
+        applicationId = "top.liaocl.moememos"
         minSdk = 26
         targetSdk = 37
         versionCode = 51
