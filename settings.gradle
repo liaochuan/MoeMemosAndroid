@@ -9,7 +9,14 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    // A user-level Gradle init script may inject Maven mirrors as project repositories, which
+    // FAIL_ON_PROJECT_REPOS rejects. The default stays strict so CI and normal builds are
+    // unaffected; scripts/build-release-arm64.ps1 passes -PpreferSettingsRepos to build on such
+    // a machine.
+    def preferSettingsRepos = providers.gradleProperty("preferSettingsRepos").isPresent()
+    repositoriesMode.set(
+        preferSettingsRepos ? RepositoriesMode.PREFER_SETTINGS : RepositoriesMode.FAIL_ON_PROJECT_REPOS
+    )
     repositories {
         google()
         mavenCentral()

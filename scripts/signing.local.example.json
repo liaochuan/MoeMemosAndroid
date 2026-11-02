@@ -1,0 +1,8 @@
+{
+  "storeFile": "C:\\path\\to\\your\\keystore",
+  "storePassword": "",
+  "keyAlias": "",
+  "keyPassword": "",
+  "javaHome": "C:\\path\\to\\jdk-17",
+  "androidHome": "C:\\path\\to\\Android\\Sdk"
+}

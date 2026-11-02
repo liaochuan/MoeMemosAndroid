@@ -105,3 +105,9 @@ lint/tmp/
 
 # Serena (Claude Code MCP server)
 .serena/
+
+# 本地打包签名配置（含密码，切勿提交）
+scripts/signing.local.json
+
+# 打包产物
+dist/
