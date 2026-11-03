@@ -15,7 +15,7 @@ class MemoChecklistTest {
             listOf(MemoLineKind.TEXT, MemoLineKind.CHECKBOX, MemoLineKind.CHECKBOX, MemoLineKind.TEXT),
             lines.map { it.kind }
         )
-        assertEquals(listOf("本周采购", "鸡蛋", "面包", "# 备注"), lines.map { it.text })
+        assertEquals(listOf("本周采购", "鸡蛋", "面包", "备注"), lines.map { it.text })
         assertEquals(listOf(false, false, true, false), lines.map { it.checked })
     }
 
@@ -153,5 +153,30 @@ class MemoChecklistTest {
     @Test
     fun lineAtAcceptsContentEndingWithBareCarriageReturn() {
         assertEquals("a", lineAt("a\r", 0, 1))
+    }
+
+    @Test
+    fun stripsHeadingAndQuoteMarkersForDisplay() {
+        val lines = parseMemoChecklist("### 待办\n> 引用\n- [ ] milk")
+
+        assertEquals(listOf("待办", "引用", "milk"), lines.map { it.text })
+        assertEquals(listOf(3, 0, 0), lines.map { it.headingLevel })
+    }
+
+    @Test
+    fun keepsHeadingMarkersInsideCodeFences() {
+        val lines = parseMemoChecklist("```\n### 待办\n```")
+
+        assertEquals(listOf("```", "### 待办", "```"), lines.map { it.text })
+        assertEquals(listOf(0, 0, 0), lines.map { it.headingLevel })
+    }
+
+    @Test
+    fun smallWidgetDropsTheHeaderAndStillShowsSeveralLines() {
+        assertEquals(false, widgetShowsHeader(110f))
+        assertEquals(4, widgetLineBudget(110f))
+        assertEquals(true, widgetShowsHeader(220f))
+        assertEquals(9, widgetLineBudget(220f))
+        assertEquals(1, widgetLineBudget(0f))
     }
 }

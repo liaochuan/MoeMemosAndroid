@@ -9,11 +9,15 @@ data class MemoLine(
     val startOffset: Int,
     val endOffset: Int,
     val indentLevel: Int,
+    /** Heading level 1..3 when the line was an ATX heading, 0 otherwise. Only used for styling. */
+    val headingLevel: Int = 0,
 )
 
 data class VisibleLines(val lines: List<MemoLine>, val truncated: Boolean)
 
 private val checkboxLinePattern = Regex("""^(\s*)([-*+])\s+\[([ xX])\](?:\s(.*))?$""")
+private val headingLinePattern = Regex("""^(\s*)(#{1,6})\s+(.*)$""")
+private val blockQuoteLinePattern = Regex("""^(\s*)>\s?(.*)$""")
 
 /**
  * Splits memo content into renderable lines, keeping each line's offset in the original content so a
@@ -53,13 +57,15 @@ fun parseMemoChecklist(content: String): List<MemoLine> {
                 else -> {
                     val match = checkboxLinePattern.matchEntire(raw)
                     if (match == null) {
+                        val display = displayTextOf(raw)
                         lines += MemoLine(
                             MemoLineKind.TEXT,
-                            raw,
+                            display.text,
                             false,
                             lineStart,
                             end,
-                            indentLevelOf(raw.takeWhile { it == ' ' || it == '\t' })
+                            indentLevelOf(raw.takeWhile { it == ' ' || it == '\t' }),
+                            display.headingLevel
                         )
                     } else {
                         val marker = match.groupValues[3]
@@ -89,6 +95,44 @@ private fun fenceMarkerOf(trimmed: String): Pair<Char, Int>? {
     if (char != '`' && char != '~') return null
     val length = trimmed.takeWhile { it == char }.length
     return if (length >= 3) char to length else null
+}
+
+private class DisplayText(val text: String, val headingLevel: Int)
+
+/**
+ * Removes the markdown markers that make a line look like source code on a home screen: ATX
+ * heading hashes and blockquote arrows. Everything else stays verbatim, so prose is never
+ * rewritten by guesswork.
+ */
+private fun displayTextOf(raw: String): DisplayText {
+    headingLinePattern.matchEntire(raw)?.let { match ->
+        return DisplayText(
+            match.groupValues[3].trimEnd(),
+            match.groupValues[2].length.coerceIn(1, 3)
+        )
+    }
+    blockQuoteLinePattern.matchEntire(raw)?.let { match ->
+        return DisplayText(match.groupValues[2], 0)
+    }
+    return DisplayText(raw, 0)
+}
+
+/** Widget chrome: 12dp padding on both sides plus the space a 14sp text line needs. */
+private const val WIDGET_PADDING_DP = 24f
+private const val WIDGET_HEADER_DP = 28f
+private const val WIDGET_LINE_DP = 18f
+private const val WIDGET_HEADER_MIN_HEIGHT_DP = 150f
+
+/**
+ * A short widget cannot afford the header row: at two cells tall it would leave room for a single
+ * memo line, which reads as a broken widget. Below this height the content gets the whole widget.
+ */
+fun widgetShowsHeader(heightDp: Float): Boolean = heightDp >= WIDGET_HEADER_MIN_HEIGHT_DP
+
+/** How many one-line entries fit into a widget [heightDp] dp tall. */
+fun widgetLineBudget(heightDp: Float): Int {
+    val chrome = WIDGET_PADDING_DP + if (widgetShowsHeader(heightDp)) WIDGET_HEADER_DP else 0f
+    return ((heightDp - chrome) / WIDGET_LINE_DP).toInt().coerceAtLeast(1)
 }
 
 /** Returns the raw line at the given offsets, or null when the range is not exactly one line of [content]. */

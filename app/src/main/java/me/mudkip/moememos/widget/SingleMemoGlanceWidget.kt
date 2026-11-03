@@ -44,6 +44,7 @@ import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.state.PreferencesGlanceStateDefinition
+import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
@@ -63,6 +64,8 @@ import me.mudkip.moememos.util.lineAt
 import me.mudkip.moememos.util.parseMemoChecklist
 import me.mudkip.moememos.util.toggleCheckboxIn
 import me.mudkip.moememos.util.visibleLines
+import me.mudkip.moememos.util.widgetLineBudget
+import me.mudkip.moememos.util.widgetShowsHeader
 import timber.log.Timber
 import java.time.Instant
 
@@ -195,49 +198,53 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         accountKey: String?,
         openInEditor: Boolean
     ) {
+        val size = LocalSize.current
+        val showHeader = widgetShowsHeader(size.height.value)
+
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .clickable(actionStartActivity(createMemoIntent(context, memo.identifier, openInEditor)))
         ) {
-            Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = DateUtils.getRelativeTimeSpanString(
-                        memo.date.toEpochMilli(),
-                        Instant.now().toEpochMilli(),
-                        DateUtils.MINUTE_IN_MILLIS
-                    ).toString(),
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 12.sp
+            if (showHeader) {
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = DateUtils.getRelativeTimeSpanString(
+                            memo.date.toEpochMilli(),
+                            Instant.now().toEpochMilli(),
+                            DateUtils.MINUTE_IN_MILLIS
+                        ).toString(),
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
                     )
-                )
-                if (memo.visibility != MemoVisibility.PUBLIC) {
-                    Spacer(modifier = GlanceModifier.width(4.dp))
-                    Image(
-                        provider = ImageProvider(android.R.drawable.ic_lock_lock),
-                        contentDescription = context.getString(R.string.memo_visibility_private),
-                        modifier = GlanceModifier.size(14.dp)
-                    )
+                    if (memo.visibility != MemoVisibility.PUBLIC) {
+                        Spacer(modifier = GlanceModifier.width(4.dp))
+                        Image(
+                            provider = ImageProvider(android.R.drawable.ic_lock_lock),
+                            contentDescription = context.getString(R.string.memo_visibility_private),
+                            modifier = GlanceModifier.size(14.dp)
+                        )
+                    }
+                    if (memo.pinned) {
+                        Spacer(modifier = GlanceModifier.width(4.dp))
+                        Image(
+                            provider = ImageProvider(R.drawable.ic_pin),
+                            contentDescription = context.getString(R.string.pin),
+                            modifier = GlanceModifier.size(14.dp),
+                            colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant)
+                        )
+                    }
                 }
-                if (memo.pinned) {
-                    Spacer(modifier = GlanceModifier.width(4.dp))
-                    Image(
-                        provider = ImageProvider(R.drawable.ic_pin),
-                        contentDescription = context.getString(R.string.pin),
-                        modifier = GlanceModifier.size(14.dp),
-                        colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant)
-                    )
-                }
+
+                Spacer(modifier = GlanceModifier.height(8.dp))
             }
 
-            Spacer(modifier = GlanceModifier.height(8.dp))
-
-            val size = LocalSize.current
-            val lineBudget = ((size.height.value - 24f - 20f - 8f) / 20f).toInt().coerceAtLeast(1)
+            val lineBudget = widgetLineBudget(size.height.value)
             val parsedLines = parseMemoChecklist(memo.content)
             if (parsedLines.isEmpty()) {
                 Text(
@@ -256,7 +263,11 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                             // Leading whitespace is rendered as padding instead of as text, so an
                             // indented line is not indented twice.
                             text = line.text.trimStart(),
-                            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
+                            style = TextStyle(
+                                color = GlanceTheme.colors.onSurface,
+                                fontSize = 14.sp,
+                                fontWeight = if (line.headingLevel > 0) FontWeight.Bold else null
+                            ),
                             maxLines = 1,
                             modifier = GlanceModifier.padding(start = (8 * line.indentLevel).dp)
                         )
