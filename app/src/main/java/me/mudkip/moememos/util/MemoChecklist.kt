@@ -135,6 +135,20 @@ fun widgetLineBudget(heightDp: Float): Int {
     return ((heightDp - chrome) / WIDGET_LINE_DP).toInt().coerceAtLeast(1)
 }
 
+/**
+ * Height of the widget as the launcher reports it, in dp.
+ *
+ * Glance's `LocalSize` is not usable here: for app widgets it returns the provider's *minimum*
+ * height (min(minHeight, minResizeHeight)), which is constant no matter how large the widget is
+ * placed, so a three-cell widget would still budget a two-cell layout. The app widget options carry
+ * the real size; the portrait height is [maxHeightDp] and [minHeightDp] is the landscape one.
+ */
+fun widgetHeightDpFromOptions(maxHeightDp: Int, minHeightDp: Int): Float? = when {
+    maxHeightDp > 0 -> maxHeightDp.toFloat()
+    minHeightDp > 0 -> minHeightDp.toFloat()
+    else -> null
+}
+
 /** Returns the raw line at the given offsets, or null when the range is not exactly one line of [content]. */
 fun lineAt(content: String, startOffset: Int, endOffset: Int): String? {
     if (startOffset < 0 || endOffset > content.length || startOffset >= endOffset) return null

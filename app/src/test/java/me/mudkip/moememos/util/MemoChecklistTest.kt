@@ -179,4 +179,11 @@ class MemoChecklistTest {
         assertEquals(9, widgetLineBudget(220f))
         assertEquals(1, widgetLineBudget(0f))
     }
+
+    @Test
+    fun widgetHeightPrefersThePortraitOptionAndFallsBackToTheMinimum() {
+        assertEquals(220f, widgetHeightDpFromOptions(maxHeightDp = 220, minHeightDp = 110))
+        assertEquals(110f, widgetHeightDpFromOptions(maxHeightDp = 0, minHeightDp = 110))
+        assertNull(widgetHeightDpFromOptions(maxHeightDp = 0, minHeightDp = 0))
+    }
 }

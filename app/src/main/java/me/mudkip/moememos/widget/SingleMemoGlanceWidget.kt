@@ -24,6 +24,7 @@ import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.AppWidgetId
 import androidx.glance.appwidget.CheckBox
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.action.ActionCallback
@@ -64,6 +65,7 @@ import me.mudkip.moememos.util.lineAt
 import me.mudkip.moememos.util.parseMemoChecklist
 import me.mudkip.moememos.util.toggleCheckboxIn
 import me.mudkip.moememos.util.visibleLines
+import me.mudkip.moememos.util.widgetHeightDpFromOptions
 import me.mudkip.moememos.util.widgetLineBudget
 import me.mudkip.moememos.util.widgetShowsHeader
 import timber.log.Timber
@@ -83,8 +85,19 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         val openInEditor = settings.usersList
             .firstOrNull { it.accountKey == settings.currentUser }
             ?.settings?.editGesture == MemoEditGesture.SINGLE
+        // Resolved here rather than from LocalSize: see widgetHeightDpFromOptions.
+        val widgetHeightDp = readWidgetHeightDp(context, id)
 
-        provideContent(createContent(context, memoService, openInEditor))
+        provideContent(createContent(context, memoService, openInEditor, widgetHeightDp))
+    }
+
+    private fun readWidgetHeightDp(context: Context, id: GlanceId): Float? {
+        val appWidgetId = (id as? AppWidgetId)?.appWidgetId ?: return null
+        val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId)
+        return widgetHeightDpFromOptions(
+            maxHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0),
+            minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+        )
     }
 
     // Keep composable lambda captures outside the coroutine state machine so Compose
@@ -92,11 +105,12 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
     private fun createContent(
         context: Context,
         memoService: MemoService,
-        openInEditor: Boolean
+        openInEditor: Boolean,
+        widgetHeightDp: Float?
     ): @Composable () -> Unit = {
         val prefs = currentState<Preferences>()
         GlanceTheme {
-            WidgetContent(context, memoService, prefs, openInEditor)
+            WidgetContent(context, memoService, prefs, openInEditor, widgetHeightDp)
         }
     }
 
@@ -105,7 +119,8 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         context: Context,
         memoService: MemoService,
         prefs: Preferences,
-        openInEditor: Boolean
+        openInEditor: Boolean,
+        widgetHeightDp: Float?
     ) {
         val memoId = prefs[SingleMemoWidgetKeys.memoId]
         val accountKey = prefs[SingleMemoWidgetKeys.accountKey]
@@ -164,7 +179,7 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                 )
                 else -> {
                     val loadedMemo = memo ?: return@Column
-                    MemoContent(context, loadedMemo, accountKey, openInEditor)
+                    MemoContent(context, loadedMemo, accountKey, openInEditor, widgetHeightDp)
                 }
             }
         }
@@ -196,10 +211,14 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         context: Context,
         memo: MemoEntity,
         accountKey: String?,
-        openInEditor: Boolean
+        openInEditor: Boolean,
+        measuredHeightDp: Float?
     ) {
-        val size = LocalSize.current
-        val showHeader = widgetShowsHeader(size.height.value)
+        // Options can be missing right after the widget is created or on launchers that do not
+        // report them; LocalSize then only gives the provider's minimum, which is the best guess
+        // left.
+        val heightDp = measuredHeightDp ?: LocalSize.current.height.value
+        val showHeader = widgetShowsHeader(heightDp)
 
         Column(
             modifier = GlanceModifier
@@ -244,7 +263,7 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                 Spacer(modifier = GlanceModifier.height(8.dp))
             }
 
-            val lineBudget = widgetLineBudget(size.height.value)
+            val lineBudget = widgetLineBudget(heightDp)
             val parsedLines = parseMemoChecklist(memo.content)
             if (parsedLines.isEmpty()) {
                 Text(
