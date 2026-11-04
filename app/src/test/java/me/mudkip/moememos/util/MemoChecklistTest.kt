@@ -172,11 +172,9 @@ class MemoChecklistTest {
     }
 
     @Test
-    fun smallWidgetDropsTheHeaderAndStillShowsSeveralLines() {
-        assertEquals(false, widgetShowsHeader(110f))
+    fun lineBudgetGrowsWithTheWidgetHeight() {
         assertEquals(4, widgetLineBudget(110f))
-        assertEquals(true, widgetShowsHeader(220f))
-        assertEquals(9, widgetLineBudget(220f))
+        assertEquals(10, widgetLineBudget(220f))
         assertEquals(1, widgetLineBudget(0f))
     }
 

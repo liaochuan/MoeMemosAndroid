@@ -3,7 +3,6 @@ package me.mudkip.moememos.widget
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
-import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,13 +12,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
-import androidx.glance.ColorFilter
 import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
-import androidx.glance.Image
-import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
@@ -36,14 +32,8 @@ import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
-import androidx.glance.layout.Row
-import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
-import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.size
-import androidx.glance.layout.width
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -57,7 +47,6 @@ import me.mudkip.moememos.MainActivity
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.local.entity.MemoEntity
 import me.mudkip.moememos.data.model.MemoEditGesture
-import me.mudkip.moememos.data.model.MemoVisibility
 import me.mudkip.moememos.data.service.MemoService
 import me.mudkip.moememos.ext.settingsDataStore
 import me.mudkip.moememos.util.MemoLineKind
@@ -67,7 +56,6 @@ import me.mudkip.moememos.util.toggleCheckboxIn
 import me.mudkip.moememos.util.visibleLines
 import me.mudkip.moememos.util.widgetHeightDpFromOptions
 import me.mudkip.moememos.util.widgetLineBudget
-import me.mudkip.moememos.util.widgetShowsHeader
 import timber.log.Timber
 import java.time.Instant
 
@@ -218,51 +206,12 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         // report them; LocalSize then only gives the provider's minimum, which is the best guess
         // left.
         val heightDp = measuredHeightDp ?: LocalSize.current.height.value
-        val showHeader = widgetShowsHeader(heightDp)
 
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .clickable(actionStartActivity(createMemoIntent(context, memo.identifier, openInEditor)))
         ) {
-            if (showHeader) {
-                Row(
-                    modifier = GlanceModifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = DateUtils.getRelativeTimeSpanString(
-                            memo.date.toEpochMilli(),
-                            Instant.now().toEpochMilli(),
-                            DateUtils.MINUTE_IN_MILLIS
-                        ).toString(),
-                        style = TextStyle(
-                            color = GlanceTheme.colors.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    )
-                    if (memo.visibility != MemoVisibility.PUBLIC) {
-                        Spacer(modifier = GlanceModifier.width(4.dp))
-                        Image(
-                            provider = ImageProvider(android.R.drawable.ic_lock_lock),
-                            contentDescription = context.getString(R.string.memo_visibility_private),
-                            modifier = GlanceModifier.size(14.dp)
-                        )
-                    }
-                    if (memo.pinned) {
-                        Spacer(modifier = GlanceModifier.width(4.dp))
-                        Image(
-                            provider = ImageProvider(R.drawable.ic_pin),
-                            contentDescription = context.getString(R.string.pin),
-                            modifier = GlanceModifier.size(14.dp),
-                            colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant)
-                        )
-                    }
-                }
-
-                Spacer(modifier = GlanceModifier.height(8.dp))
-            }
-
             val lineBudget = widgetLineBudget(heightDp)
             val parsedLines = parseMemoChecklist(memo.content)
             if (parsedLines.isEmpty()) {

@@ -119,21 +119,11 @@ private fun displayTextOf(raw: String): DisplayText {
 
 /** Widget chrome: 12dp padding on both sides plus the space a 14sp text line needs. */
 private const val WIDGET_PADDING_DP = 24f
-private const val WIDGET_HEADER_DP = 28f
 private const val WIDGET_LINE_DP = 18f
-private const val WIDGET_HEADER_MIN_HEIGHT_DP = 150f
-
-/**
- * A short widget cannot afford the header row: at two cells tall it would leave room for a single
- * memo line, which reads as a broken widget. Below this height the content gets the whole widget.
- */
-fun widgetShowsHeader(heightDp: Float): Boolean = heightDp >= WIDGET_HEADER_MIN_HEIGHT_DP
 
 /** How many one-line entries fit into a widget [heightDp] dp tall. */
-fun widgetLineBudget(heightDp: Float): Int {
-    val chrome = WIDGET_PADDING_DP + if (widgetShowsHeader(heightDp)) WIDGET_HEADER_DP else 0f
-    return ((heightDp - chrome) / WIDGET_LINE_DP).toInt().coerceAtLeast(1)
-}
+fun widgetLineBudget(heightDp: Float): Int =
+    ((heightDp - WIDGET_PADDING_DP) / WIDGET_LINE_DP).toInt().coerceAtLeast(1)
 
 /**
  * Height of the widget as the launcher reports it, in dp.
