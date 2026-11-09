@@ -65,6 +65,11 @@
     <string name="copy_link">複製連結</string>
     <string name="open">打開</string>
     <string name="archive">歸檔</string>
+    <string name="clear_completed_tasks">清除已完成待辦</string>
+    <string name="clear">清除</string>
+    <plurals name="clear_completed_tasks_confirm">
+        <item quantity="other">將從這條 MEMO 中刪除 %1$d 條已完成待辦。</item>
+    </plurals>
     <string name="memo_visibility_public">訪客可見</string>
     <string name="memo_visibility_protected">本地使用者可見</string>
     <string name="memo_visibility_private">僅自己可見</string>

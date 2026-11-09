@@ -19,6 +19,7 @@ You can use Moe Memos with either a self-hosted [✍️memos](https://github.com
 - **应用标识改为 `top.liaocl.moememos`**：可与上游原版（`me.mudkip.moememos`）同时安装，两者数据互不干扰。Kotlin 包名与 `namespace` 保持不变，FileProvider authority 与快捷方式 `targetPackage` 已同步调整。
 - **新增「单条 Memo」桌面小部件**：创建时绑定单条 memo（可新建或从列表中选择），在桌面上展示正文并把 `- [ ]` / `- [x]` 渲染为真正的勾选框，点击即可写回该 memo；支持置顶/私有标记、缺失 memo 提示、按尺寸裁剪内容与定期刷新。
 - **新增 checklist 解析与切换工具**（`MemoChecklist`）：负责解析 memo 中的复选框行、按字符区间切换勾选状态，并附有单元测试。
+- **memo 三点菜单新增「清除已完成待办」**：仅当该 memo 存在已勾选的复选框时显示，确认后一次性删除这些已完成的行并走正常同步；代码块中的示例复选框不受影响。
 - **新增 arm64-v8a 单 ABI 打包脚本** `scripts/build-release-arm64.ps1`：产出 `dist/moememos-<versionName>-arm64-v8a.apk`，会校验 APK 内只含 arm64-v8a；签名信息由环境变量或本地 `scripts/signing.local.json` 提供（该文件不入库）。
 - **构建适配**：`app/build.gradle` 支持可选的 `-PabiFilter` 单 ABI 构建；`settings.gradle` 支持 `-PpreferSettingsRepos`，用于绕过本机 Gradle init 镜像脚本与 `FAIL_ON_PROJECT_REPOS` 的冲突（默认仍为严格模式，CI 不受影响）。
 - **`.gitignore` 补充**：忽略本地签名配置与 `dist/` 打包产物。

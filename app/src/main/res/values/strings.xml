@@ -78,6 +78,12 @@
     <string name="copy_link">Copy Link</string>
     <string name="open">Open</string>
     <string name="archive">Archive</string>
+    <string name="clear_completed_tasks">Clear completed tasks</string>
+    <string name="clear">Clear</string>
+    <plurals name="clear_completed_tasks_confirm">
+        <item quantity="one">%1$d completed task will be removed from this memo.</item>
+        <item quantity="other">%1$d completed tasks will be removed from this memo.</item>
+    </plurals>
     <string name="memo_visibility_public">Visible to guests</string>
     <string name="memo_visibility_protected">Visible to local members</string>
     <string name="memo_visibility_private">Only visible to you</string>

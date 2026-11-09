@@ -184,4 +184,46 @@ class MemoChecklistTest {
         assertEquals(110f, widgetHeightDpFromOptions(maxHeightDp = 0, minHeightDp = 110))
         assertNull(widgetHeightDpFromOptions(maxHeightDp = 0, minHeightDp = 0))
     }
+
+    @Test
+    fun countsOnlyCheckedCheckboxLines() {
+        assertEquals(2, completedChecklistCount("a\n- [x] one\n- [ ] two\n* [X] three"))
+        assertEquals(0, completedChecklistCount("plain"))
+        assertEquals(0, completedChecklistCount("```\n- [x] code\n```\n- [ ] real"))
+    }
+
+    @Test
+    fun removesCompletedCheckboxLinesAndTheirLineBreaks() {
+        assertEquals(
+            "a\n- [ ] two\nb",
+            removeCompletedChecklistLines("a\n- [x] one\n- [ ] two\nb")
+        )
+        assertEquals(
+            "a\r\n- [ ] two\r\nb",
+            removeCompletedChecklistLines("a\r\n- [X] one\r\n- [ ] two\r\nb")
+        )
+        assertEquals("a", removeCompletedChecklistLines("a\n  - [x] indented"))
+        assertEquals("", removeCompletedChecklistLines("- [x] only"))
+    }
+
+    @Test
+    fun removesAdjacentCompletedLinesAtTheEnd() {
+        assertEquals("", removeCompletedChecklistLines("- [x] a\n- [x] b"))
+        assertEquals("", removeCompletedChecklistLines("- [x] a\n- [x] b\n"))
+        assertEquals("a", removeCompletedChecklistLines("a\n- [x] b\n- [x] c"))
+        assertEquals("a", removeCompletedChecklistLines("a\r\n- [x] b\r\n- [x] c\r\n"))
+        assertEquals("a", removeCompletedChecklistLines("a\n  - [x] b\n  - [x] c\n"))
+    }
+
+    @Test
+    fun removesBlankLinesLeftBetweenCompletedItemsAtTheEnd() {
+        assertEquals("a", removeCompletedChecklistLines("a\n- [x] b\n\n- [x] c\n"))
+    }
+
+    @Test
+    fun returnsNullWhenNothingCompleted() {
+        assertNull(removeCompletedChecklistLines("a\n- [ ] open"))
+        assertNull(removeCompletedChecklistLines("```\n- [x] code\n```"))
+        assertNull(removeCompletedChecklistLines(""))
+    }
 }

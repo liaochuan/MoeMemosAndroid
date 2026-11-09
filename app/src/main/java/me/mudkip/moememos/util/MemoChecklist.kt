@@ -166,6 +166,66 @@ fun toggleCheckboxIn(content: String, startOffset: Int, endOffset: Int, checked:
     return content.substring(0, markerOffset) + newMarker + content.substring(markerOffset + 1)
 }
 
+/** Number of checked checkbox lines, ignoring fenced code blocks. */
+fun completedChecklistCount(content: String): Int =
+    parseMemoChecklist(content).count { it.kind == MemoLineKind.CHECKBOX && it.checked }
+
+/**
+ * Removes every checked checkbox line together with its line break. Returns null when nothing was
+ * checked, so callers can treat null as "nothing to write".
+ *
+ * When a removed line sits at the end of the memo, the line break before it goes too, so clearing
+ * the tail does not leave a dangling empty line.
+ */
+fun removeCompletedChecklistLines(content: String): String? {
+    val completed = parseMemoChecklist(content)
+        .filter { it.kind == MemoLineKind.CHECKBOX && it.checked }
+    if (completed.isEmpty()) return null
+
+    // Build ranges against the original content, then merge overlapping ones before deleting from
+    // the end. Two adjacent completed lines share the line break that the last-line rule extends
+    // over, so deleting them one by one would run past the shortened string.
+    val deletions = completed.map { line ->
+        val end = line.endOffset
+        val lineEnd = when {
+            content.getOrNull(end) == '\r' && content.getOrNull(end + 1) == '\n' -> end + 2
+            content.getOrNull(end) == '\n' -> end + 1
+            else -> end
+        }
+        val start = if (lineEnd == content.length) {
+            when {
+                line.startOffset >= 2 && content.startsWith("\r\n", line.startOffset - 2) -> line.startOffset - 2
+                line.startOffset >= 1 && content[line.startOffset - 1] == '\n' -> line.startOffset - 1
+                else -> line.startOffset
+            }
+        } else {
+            line.startOffset
+        }
+        start until lineEnd
+    }.sortedBy { it.first }
+
+    val merged = mutableListOf<IntRange>()
+    for (range in deletions) {
+        val last = merged.lastOrNull()
+        if (last != null && range.first <= last.last + 1) {
+            merged[merged.lastIndex] = last.first..maxOf(last.last, range.last)
+        } else {
+            merged += range
+        }
+    }
+
+    var result = content
+    for (range in merged.asReversed()) {
+        result = result.removeRange(range.first, range.last + 1)
+    }
+    // The deleted block reached the end of the memo: drop the line break that separated it from the
+    // surviving text, so clearing the tail does not leave a dangling empty line.
+    if (merged.last().last + 1 == content.length) {
+        result = result.removeSuffix("\r\n").removeSuffix("\n")
+    }
+    return result
+}
+
 /**
  * Keeps the leading lines that fit [lineBudget], flagging whether anything was cut.
  *

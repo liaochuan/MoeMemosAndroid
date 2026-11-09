@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.ClearAll
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.skydoves.sandwich.suspendOnSuccess
@@ -57,6 +59,8 @@ import me.mudkip.moememos.ext.navigateToMemoEditor
 import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ext.titleResource
 import me.mudkip.moememos.ui.page.common.LocalRootNavController
+import me.mudkip.moememos.util.completedChecklistCount
+import me.mudkip.moememos.util.removeCompletedChecklistLines
 import me.mudkip.moememos.viewmodel.LocalMemos
 import me.mudkip.moememos.viewmodel.LocalUserState
 
@@ -189,6 +193,8 @@ fun MemosCardActionButton(
     val rootNavController = LocalRootNavController.current
     val scope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showClearCompletedDialog by remember { mutableStateOf(false) }
+    val completedCount = remember(memo.content) { completedChecklistCount(memo.content) }
     val memoLabel = stringResource(R.string.memo)
 
     Box {
@@ -293,6 +299,20 @@ fun MemosCardActionButton(
                         )
                     })
             }
+            if (completedCount > 0) {
+                DropdownMenuItem(
+                    text = { Text(R.string.clear_completed_tasks.string) },
+                    onClick = {
+                        showClearCompletedDialog = true
+                        menuExpanded = false
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.ClearAll,
+                            contentDescription = null
+                        )
+                    })
+            }
             DropdownMenuItem(
                 text = { Text(R.string.archive.string) },
                 onClick = {
@@ -356,6 +376,58 @@ fun MemosCardActionButton(
                 TextButton(
                     onClick = {
                         showDeleteDialog = false
+                    }
+                ) {
+                    Text(R.string.cancel.string)
+                }
+            }
+        )
+    }
+
+    if (showClearCompletedDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearCompletedDialog = false },
+            title = { Text(R.string.clear_completed_tasks.string) },
+            text = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.clear_completed_tasks_confirm,
+                        completedCount,
+                        completedCount
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val newContent = removeCompletedChecklistLines(memo.content)
+                        if (newContent == null) {
+                            showClearCompletedDialog = false
+                        } else {
+                            scope.launch {
+                                memosViewModel.editMemo(
+                                    memo.identifier,
+                                    newContent,
+                                    memo.resources,
+                                    memo.visibility
+                                ).suspendOnSuccess {
+                                    showClearCompletedDialog = false
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(R.string.clear.string)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showClearCompletedDialog = false
                     }
                 ) {
                     Text(R.string.cancel.string)
