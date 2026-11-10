@@ -46,7 +46,6 @@ import kotlinx.coroutines.withContext
 import me.mudkip.moememos.MainActivity
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.local.entity.MemoEntity
-import me.mudkip.moememos.data.model.MemoEditGesture
 import me.mudkip.moememos.data.service.MemoService
 import me.mudkip.moememos.ext.settingsDataStore
 import me.mudkip.moememos.util.MemoLineKind
@@ -69,14 +68,10 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
             WidgetEntryPoint::class.java
         )
         val memoService = widgetEntryPoint.memoService()
-        val settings = context.settingsDataStore.data.first()
-        val openInEditor = settings.usersList
-            .firstOrNull { it.accountKey == settings.currentUser }
-            ?.settings?.editGesture == MemoEditGesture.SINGLE
         // Resolved here rather than from LocalSize: see widgetHeightDpFromOptions.
         val widgetHeightDp = readWidgetHeightDp(context, id)
 
-        provideContent(createContent(context, memoService, openInEditor, widgetHeightDp))
+        provideContent(createContent(context, memoService, widgetHeightDp))
     }
 
     private fun readWidgetHeightDp(context: Context, id: GlanceId): Float? {
@@ -93,12 +88,11 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
     private fun createContent(
         context: Context,
         memoService: MemoService,
-        openInEditor: Boolean,
         widgetHeightDp: Float?
     ): @Composable () -> Unit = {
         val prefs = currentState<Preferences>()
         GlanceTheme {
-            WidgetContent(context, memoService, prefs, openInEditor, widgetHeightDp)
+            WidgetContent(context, memoService, prefs, widgetHeightDp)
         }
     }
 
@@ -107,7 +101,6 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         context: Context,
         memoService: MemoService,
         prefs: Preferences,
-        openInEditor: Boolean,
         widgetHeightDp: Float?
     ) {
         val memoId = prefs[SingleMemoWidgetKeys.memoId]
@@ -167,7 +160,7 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                 )
                 else -> {
                     val loadedMemo = memo ?: return@Column
-                    MemoContent(context, loadedMemo, accountKey, openInEditor, widgetHeightDp)
+                    MemoContent(context, loadedMemo, accountKey, widgetHeightDp)
                 }
             }
         }
@@ -199,7 +192,6 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         context: Context,
         memo: MemoEntity,
         accountKey: String?,
-        openInEditor: Boolean,
         measuredHeightDp: Float?
     ) {
         // Options can be missing right after the widget is created or on launchers that do not
@@ -210,7 +202,7 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .clickable(actionStartActivity(createMemoIntent(context, memo.identifier, openInEditor)))
+                .clickable(actionStartActivity(createMemoIntent(context, memo.identifier)))
         ) {
             val lineBudget = widgetLineBudget(heightDp)
             val parsedLines = parseMemoChecklist(memo.content)
@@ -364,9 +356,13 @@ object ToggleCheckboxKeys {
     val expectedLine: ActionParameters.Key<String> = ActionParameters.Key("single_memo_toggle_line")
 }
 
-private fun createMemoIntent(context: Context, memoId: String, openInEditor: Boolean): Intent =
+/**
+ * Tapping the widget always lands in the memo editor, regardless of the app's edit-gesture setting:
+ * the widget only shows one memo, and looking at it on the detail page adds a step before editing.
+ */
+private fun createMemoIntent(context: Context, memoId: String): Intent =
     Intent(context, MainActivity::class.java).apply {
-        action = if (openInEditor) MainActivity.ACTION_EDIT_MEMO else MainActivity.ACTION_VIEW_MEMO
+        action = MainActivity.ACTION_EDIT_MEMO
         putExtra(MainActivity.EXTRA_MEMO_ID, memoId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
