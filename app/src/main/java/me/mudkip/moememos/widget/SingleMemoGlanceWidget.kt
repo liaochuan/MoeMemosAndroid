@@ -12,16 +12,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
+import androidx.glance.ColorFilter
 import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.AppWidgetId
-import androidx.glance.appwidget.CheckBox
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
@@ -32,8 +34,10 @@ import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -231,24 +235,47 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
                             maxLines = 1,
                             modifier = GlanceModifier.padding(start = (8 * line.indentLevel).dp)
                         )
-                        MemoLineKind.CHECKBOX -> CheckBox(
-                            checked = line.checked,
-                            onCheckedChange = actionRunCallback<ToggleCheckboxAction>(
-                                actionParametersOf(
-                                    ToggleCheckboxKeys.memoId to memo.identifier,
-                                    ToggleCheckboxKeys.accountKey to accountKey.orEmpty(),
-                                    ToggleCheckboxKeys.startOffset to line.startOffset,
-                                    ToggleCheckboxKeys.endOffset to line.endOffset,
-                                    ToggleCheckboxKeys.targetChecked to !line.checked,
-                                    ToggleCheckboxKeys.expectedLine to
-                                        memo.content.substring(line.startOffset, line.endOffset)
-                                )
-                            ),
-                            text = line.text,
-                            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
-                            maxLines = 1,
-                            modifier = GlanceModifier.padding(start = (8 * line.indentLevel).dp)
-                        )
+                        // A plain clickable row, not Glance's CheckBox: on API 31+ the checked-change
+                        // response is attached to the CheckBox's wrapper FrameLayout, and the
+                        // framework drops a response whose target is not the CompoundButton itself,
+                        // so the tap only toggled the box on screen and the write never ran.
+                        MemoLineKind.CHECKBOX -> Row(
+                            modifier = GlanceModifier
+                                .padding(start = (8 * line.indentLevel).dp)
+                                .clickable(
+                                    actionRunCallback<ToggleCheckboxAction>(
+                                        actionParametersOf(
+                                            ToggleCheckboxKeys.memoId to memo.identifier,
+                                            ToggleCheckboxKeys.accountKey to accountKey.orEmpty(),
+                                            ToggleCheckboxKeys.startOffset to line.startOffset,
+                                            ToggleCheckboxKeys.endOffset to line.endOffset,
+                                            ToggleCheckboxKeys.targetChecked to !line.checked,
+                                            ToggleCheckboxKeys.expectedLine to
+                                                memo.content.substring(line.startOffset, line.endOffset)
+                                        )
+                                    )
+                                ),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Image(
+                                provider = ImageProvider(
+                                    if (line.checked) {
+                                        R.drawable.widget_checkbox_checked
+                                    } else {
+                                        R.drawable.widget_checkbox_unchecked
+                                    }
+                                ),
+                                contentDescription = null,
+                                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant),
+                                modifier = GlanceModifier.size(16.dp)
+                            )
+                            Text(
+                                text = line.text,
+                                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
+                                maxLines = 1,
+                                modifier = GlanceModifier.padding(start = 6.dp)
+                            )
+                        }
                     }
                 }
                 if (showEllipsis) {

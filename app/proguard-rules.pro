@@ -99,6 +99,15 @@
 #    static <1>$$serializer INSTANCE;
 #}
 
+# Glance recreates widget action callbacks by class name through reflection: the broadcast
+# receiver does Class.forName(<callback class>).getDeclaredConstructor().newInstance(). The
+# library's own consumer rule only keeps the class name, so R8 is free to drop the no-arg
+# constructor of a callback that nothing calls directly, and every widget action then fails with
+# NoSuchMethodException (the tap does nothing and the widget is never refreshed).
+-keep class * implements androidx.glance.appwidget.action.ActionCallback {
+    <init>();
+}
+
 # A resource is loaded with a relative path so the package of this class must be preserved.
 -adaptresourcefilenames okhttp3/internal/publicsuffix/PublicSuffixDatabase.gz
 
