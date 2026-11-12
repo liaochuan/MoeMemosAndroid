@@ -1,0 +1,5 @@
+## What's Changed
+* Fixed tapping a to-do in the single memo widget doing nothing in release builds: R8 removed the
+  constructors Glance uses to recreate widget action callbacks, so the tap never reached the app.
+  The widget refresh button was affected by the same rule.
+* Fixed the memo editor showing older content than the widget or a sync left in the database.
