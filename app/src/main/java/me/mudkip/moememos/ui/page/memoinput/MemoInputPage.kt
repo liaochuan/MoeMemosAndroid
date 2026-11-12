@@ -80,6 +80,10 @@ fun MemoInputPage(
     var autosaveDirty by remember { mutableStateOf(false) }
     var exiting by remember { mutableStateOf(false) }
     var initialContent by remember { mutableStateOf(memo?.content ?: "") }
+    // Content this page last read from the database. Kept across recreation (process death, the app
+    // lock tearing the page down) so a restored page can still tell "nothing was typed here" from
+    // "the restored text is an edit that was never saved".
+    var loadedContent by rememberSaveable { mutableStateOf(memo?.content ?: "") }
     var text by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(memo?.content ?: "", TextRange(memo?.content?.length ?: 0)))
     }
@@ -109,6 +113,25 @@ fun MemoInputPage(
             currentVisibility == base.visibility &&
             locationState.value == base.location &&
             viewModel.uploadResources.size == base.resources.size
+    }
+
+    /**
+     * Re-reads the memo and takes over its content when the text still equals what this page last
+     * read. A memo can change while the page stays in the back stack: the single memo widget writes
+     * straight to the repository and a sync can pull a newer copy from the server, while the editor
+     * only loaded the text once. Without this it keeps showing — and on Send saves — the older
+     * content. Text that no longer matches [loadedContent] was typed here and is never overwritten.
+     */
+    suspend fun adoptMemoChangedOutsideEditor() {
+        if (text.text != loadedContent) return
+        val current = baseline
+        val identifier = current?.identifier ?: memoIdentifier ?: return
+        val fresh = viewModel.loadMemo(identifier) ?: return
+        if (fresh.content == text.text) return
+        baseline = (current ?: fresh).copy(content = fresh.content)
+        loadedContent = fresh.content
+        initialContent = fresh.content
+        text = TextFieldValue(fresh.content, TextRange(fresh.content.length))
     }
 
     fun submit() = coroutineScope.launch {
@@ -359,6 +382,7 @@ fun MemoInputPage(
                 if (!editorRestored && (memo == null || isUntouchedExistingMemo())) {
                     baseline = fresh
                     initialContent = fresh.content
+                    loadedContent = fresh.content
                     currentVisibility = fresh.visibility
                     locationState = MemoLocationChange(fresh.location)
                     viewModel.uploadResources.clear()
@@ -387,6 +411,9 @@ fun MemoInputPage(
         }
         editorRestored = true
         initialized = true
+        // A page restored after process death or the app lock keeps the text it was saved with, so
+        // it has to check the database too instead of only trusting `editorRestored`.
+        adoptMemoChangedOutsideEditor()
         delay(300)
         focusRequester.requestFocus()
     }
@@ -413,6 +440,21 @@ fun MemoInputPage(
             location = locationState.value
         ).suspendOnSuccess {
             autosaveIdentifier = data.identifier
+        }
+    }
+
+    // The memo can change while this page sits in the back stack: the single memo widget writes
+    // straight to the repository and a sync can pull a newer copy from the server. Re-read it every
+    // time the page comes back, instead of showing the text it was opened with.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                coroutineScope.launch { adoptMemoChangedOutsideEditor() }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
