@@ -1,6 +1,7 @@
 package me.mudkip.moememos.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateUtils
@@ -62,6 +63,7 @@ import me.mudkip.moememos.data.service.AccountService
 import me.mudkip.moememos.data.service.MemoService
 import me.mudkip.moememos.ui.security.AppLockGate
 import me.mudkip.moememos.ui.theme.MoeMemosTheme
+import me.mudkip.moememos.util.AppLanguage
 import timber.log.Timber
 import java.time.Instant
 import javax.inject.Inject
@@ -77,6 +79,10 @@ class SingleMemoWidgetConfigurationActivity : FragmentActivity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var currentAccount: Account? = null
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

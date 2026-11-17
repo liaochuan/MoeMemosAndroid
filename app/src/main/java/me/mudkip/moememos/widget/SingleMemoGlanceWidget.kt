@@ -52,6 +52,7 @@ import me.mudkip.moememos.R
 import me.mudkip.moememos.data.local.entity.MemoEntity
 import me.mudkip.moememos.data.service.MemoService
 import me.mudkip.moememos.ext.settingsDataStore
+import me.mudkip.moememos.util.AppLanguage
 import me.mudkip.moememos.util.MemoLineKind
 import me.mudkip.moememos.util.lineAt
 import me.mudkip.moememos.util.parseMemoChecklist
@@ -75,7 +76,7 @@ class SingleMemoGlanceWidget : GlanceAppWidget() {
         // Resolved here rather than from LocalSize: see widgetHeightDpFromOptions.
         val widgetHeightDp = readWidgetHeightDp(context, id)
 
-        provideContent(createContent(context, memoService, widgetHeightDp))
+        provideContent(createContent(AppLanguage.wrap(context), memoService, widgetHeightDp))
     }
 
     private fun readWidgetHeightDp(context: Context, id: GlanceId): Float? {
