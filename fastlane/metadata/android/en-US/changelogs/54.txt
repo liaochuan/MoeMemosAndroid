@@ -1,0 +1,5 @@
+## What's Changed
+* Synced with upstream 2.1.0: in-app language selection, more reliable tag detection, and a
+  Vietnamese translation.
+* In-app language switching now also applies to the single memo widget and its configuration
+  screen, and error messages are localized.
